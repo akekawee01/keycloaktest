@@ -22,4 +22,8 @@ urlpatterns = [
     path('login/', keycloak_API.redirectToKeycloak),
     path('callback', keycloak_API.sso_token),
     path('logout/', keycloak_API.provider_logout),
+
+    path('test_jwt/', keycloak_API.api_testing),
+    
+    
 ]

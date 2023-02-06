@@ -1,7 +1,7 @@
 from django.shortcuts import redirect, render
 #####################
 from django.contrib.auth.models import User
-from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
+from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST ,HTTP_401_UNAUTHORIZED
 from rest_framework.response import Response
 import requests
 from django.http import HttpResponseRedirect
@@ -11,8 +11,24 @@ from rest_framework.permissions import AllowAny
 import base64
 import json
 import os
+import jwt
 from dotenv import load_dotenv
 load_dotenv()
+
+############################# Generate JWT ###########################
+def jwt_generate(payload):
+
+    encoded_jwt = jwt.encode(payload, "secret", algorithm="HS256")
+   
+    return encoded_jwt 
+############################# Decode JWT ###########################
+def jwt_decode(jwt):
+    try:
+        # request.GET['jwt']
+        encoded_jwt = jwt.decode(jwt, "secret", algorithms=["HS256"])
+        return encoded_jwt
+    except:
+        return Response("verify_failed", status=HTTP_401_UNAUTHORIZED) 
 ############################# Redirect URL ###########################
 @api_view(['GET'])
 @permission_classes((AllowAny,))
@@ -68,12 +84,15 @@ def sso_token(request):
                     response_info = response_info.json()        
                     print(response_info)
                     if response_info['sub'][0:2] == "f:" : #  check if be PEA employee or not
-                        
+                        payload = {"user": response_info['preferred_username'], "name" : "azure marada"}
+                        jwt = jwt_generate(payload)
+                        print("-----------------")
+                        print(jwt)
                     # if User.objects.filter(username=response_info['preferred_username']).exists():      #Check if User in Your DB
                         response = redirect('http://localhost:8000/nopage')                  
                         response.set_cookie('msg', 'success', max_age=1000)
                         response.set_cookie('user', response_info['preferred_username'], max_age=1000)
-                        response.set_cookie('token',"your_system_token", max_age=1000)
+                        response.set_cookie('token',jwt, max_age=1000, httponly= True , samesite= 'Strict')
                         return response
                 else:
                     msg = {"msg" : "iss_or_aud_mistake"}
@@ -96,4 +115,13 @@ def sso_token(request):
 def provider_logout(request):
     
     return HttpResponseRedirect(os.getenv('Keycloak_Logout_Url'))
-
+############################# API TESTING  ###########################
+@api_view(['GET'])
+@permission_classes((AllowAny,))
+def api_testing(request):
+    try :
+        jwt_decode(request.COOKIES.get('token'))
+        print("ok na ja")
+        return Response("success", status=HTTP_200_OK) 
+    except:
+        return Response("verify_failed", status=HTTP_401_UNAUTHORIZED) 
